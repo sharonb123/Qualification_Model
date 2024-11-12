@@ -1,0 +1,129 @@
+---
+title: 'Milestone 6: Deployment in Shiny'
+author: Nosipho Precious Donkrag, Tshepang Mokgosi, Pitsi Pitsi, Nontsikelelo  Sharon
+  Buhlungu
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+setwd('C:/Users/nosip/Documents/third Year/BIN381/milestones/')
+```
+
+#### Load library Shiny:
+```{r}
+# Load the Shiny package
+#install.packages("shiny")
+#install.packages("randomForest")
+library(shiny)
+library(randomForest)
+library(dplyr)
+```
+
+#### Load dataset
+```{r}
+data_df <- read.csv("final_data_form 1.csv",
+ header = TRUE)
+```
+
+
+```{r}
+# Selecting the specified columns
+data_df <- data_df %>%
+  select(Annual_Salary, Net_months, Qualify, Months_Annual, Occupation_Cleric., Gross_Salary, FRS.Contribution, Gross_Months, age)
+names(data_df)
+```
+#### Load the Random Forest Model:
+```{r}
+# Load the random forest model
+random_forest_model <- readRDS("retrained_rf_model2.rds")
+```
+
+#### User Interface
+```{r}
+# UI
+ui <- fluidPage(
+    titlePanel("Predictive Model App"),
+    sidebarLayout(
+        sidebarPanel(
+            numericInput("Annual_Salary", "Annual Salary:", min = 0, value = 50000),
+            numericInput("Months_Annual", "Months Since Last Annual Pay:", min = 1, value = 12),
+            numericInput("Gross_Salary", "Gross Salary:", value = 5000),
+            numericInput("FRS.Contribution", "FRS Contribution:", min = 0, value = 200),
+            numericInput("Net_months", "Net Months:", min = 0, value = 12),
+            numericInput("Gross_Months", "Gross Months:", value = 12),
+            selectInput("Occupation_Cleric.", "Occupation Cleric:", choices = c("Yes" = 1, "No" = 0), selected = 0),
+            numericInput("age", "Age:", min = 18, value = 30),
+            actionButton("predict", "Predict")
+        ),
+        mainPanel(
+            h3("Prediction Result"),
+            uiOutput("prediction")  # Change from textOutput to uiOutput
+        )
+    )
+)
+
+```
+
+#### Server Logic: 
+Create a dataframe that will mimic the input the model was fed.
+```{r}
+server <- function(input, output) {
+    observeEvent(input$predict, {
+        # Create a new dataframe with the inputs, treating Occupation_Cleric. as integer
+        input_data <- data.frame(
+            Annual_Salary = as.numeric(input$Annual_Salary),
+            Months_Annual = as.numeric(input$Months_Annual),
+            Gross_Salary = as.numeric(input$Gross_Salary),
+            FRS.Contribution = as.numeric(input$FRS.Contribution),
+            Net_months = as.numeric(input$Net_months),
+            Gross_Months = as.numeric(input$Gross_Months),
+            Occupation_Cleric. = as.integer(input$Occupation_Cleric.),  # Set as integer
+            age = as.numeric(input$age)
+        )
+        
+        # Load the model
+        random_forest_model <- readRDS("retrained_rf_model2.rds")
+        
+        # Predict using the loaded model
+        prediction <- predict(random_forest_model, newdata = input_data)
+        
+        # Interpret the prediction and set color based on result
+        if (prediction == 1) {
+            result <- "<span style='color: green;'>Congratulations! You qualify for the service.</span>"
+        } else {
+            result <- "<span style='color: red;'>Unfortunately, you do not qualify for the service.</span>"
+        }
+        
+        # Display the prediction result with HTML formatting
+        output$prediction <- renderText({ HTML(result) })
+    })
+}
+
+```
+
+Run the application:
+```{r}
+# Run the application
+shinyApp(ui = ui, server = server)
+```
+
+### The Final Layout of the Web Application:
+
+![Predictive Model App Dashboard](DashApp.png)
+
+### Documentation (Usage Guide)
+- The web application has input sections where users can enter their data and press the predict button to find out if they qualify for the service.
+
+- The Inputs required:
+  - Annual Salary;
+  - Months since the last annual Salary (just in case you are recently unemployed);
+  - Gross Salary;
+  - FRS_contribution (has a min of 0 for those applicants that do not have an FRS contribution);
+  - Age (set at a minimum of 18)
+  - A drop-down to indicate if you work as a cleric; has this does affect the output of the model. as seen from feature importance. 
+  - Once all of this data has been entered; the predict button can be pressed and a prediction made.
